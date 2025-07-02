@@ -20,6 +20,10 @@ export const setTokens = (accessToken: string, refreshToken: string) => {
   localStorage.setItem('refreshToken', refreshToken);
 };
 
+export const setIsSuperAdmin = (isSuperAdmin: boolean) => {
+  localStorage.setItem('isSuperAdmin', isSuperAdmin);
+};
+
 export const clearTokens = () => {
   localStorage.removeItem('accessToken');
   localStorage.removeItem('refreshToken');
@@ -28,6 +32,7 @@ export const clearTokens = () => {
 
 export const getAccessToken = () => localStorage.getItem('accessToken');
 export const getRefreshToken = () => localStorage.getItem('refreshToken');
+export const getIsSuperAdmin = () => localStorage.getItem('isSuperAdmin');
 
 
 export const login = async (credentials: LoginCredentials): Promise<LoginResponse> => {

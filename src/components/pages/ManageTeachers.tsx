@@ -1,14 +1,39 @@
-import React, { useState } from 'react';
-import { useGetTeachers, useSearchTeachers, useAddTeacher, useAddMultipleTeachers, useEditTeacher, useDeleteTeacher } from '../../hooks/useAdmin';
+import React, { useState, useRef } from "react";
+import {
+  useGetTeachers,
+  useSearchTeachers,
+  useAddTeacher,
+  useAddMultipleTeachers,
+  useEditTeacher,
+  useDeleteTeacher,
+} from "../../hooks/useAdmin";
+import { Ellipsis, Search } from "lucide-react";
+import ThemedText from "../commons/typography/ThemedText";
+import FullScreenSpinner from "../commons/loader/FullScreenSpinner";
+import ErrorComponent from "../commons/error/ErrorComponent";
+
+const teacherImages = [
+  "../../../src/assets/teachers/teacher8.png",
+  "../../../src/assets/teachers/teacher10.jpg",
+  "../../../src/assets/teachers/teacher7.png",
+  "../../../src/assets/teachers/teacher2.jpg",
+  "../../../src/assets/teachers/teacher3.jpg",
+  "../../../src/assets/teachers/teacher4.jpg",
+  "../../../src/assets/teachers/teacher5.png",
+  "../../../src/assets/teachers/teacher6.png",
+  "../../../src/assets/teachers/teacher1.jpg",
+];
 
 const ManageTeachers: React.FC = () => {
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [inputQuery, setInputQuery] = useState('');
-  const { data: teachers, isLoading, error } = useGetTeachers(page, limit);
-  const { data: searchedTeachers, isLoading: isSearchLoading } = useSearchTeachers(searchQuery);
-  const { mutate: addTeacher } = useAddTeacher();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [inputQuery, setInputQuery] = useState("");
+  const { data: teachers, isLoading, error, refetch } = useGetTeachers(page, limit);
+  const { data: searchedTeachers, isLoading: isSearchLoading } =
+    useSearchTeachers(searchQuery);
+  const { mutate: addTeacher, isPending: isAddingSingleTeacher } =
+    useAddTeacher();
   const { mutate: addMultipleTeachers } = useAddMultipleTeachers();
   const { mutate: editTeacher } = useEditTeacher();
   const { mutate: deleteTeacher } = useDeleteTeacher();
@@ -17,20 +42,23 @@ const ManageTeachers: React.FC = () => {
   const [showAddSingleModal, setShowAddSingleModal] = useState(false);
   const [showAddMultipleModal, setShowAddMultipleModal] = useState(false);
   const [singleTeacherForm, setSingleTeacherForm] = useState({
-    name: '',
-    email: '',
-    password: '',
-    phone_number: '',
+    name: "",
+    email: "",
+    phone_number: "",
   });
   const [previewData, setPreviewData] = useState<string[][]>([]);
   const [selectedTeacher, setSelectedTeacher] = useState<any | null>(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({
-    name: '',
-    email: '',
-    phone_number: '',
+    name: "",
+    email: "",
+    phone_number: "",
   });
+
+  // Refs for positioning pop-ups
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const ellipsisButtonRef = useRef<HTMLButtonElement>(null);
 
   const handleSearchInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputQuery(e.target.value);
@@ -47,11 +75,13 @@ const ManageTeachers: React.FC = () => {
       reader.onload = (event) => {
         const text = event.target?.result as string;
         const rows = text
-          .split('\n')
-          .map((row) => row.split(',').map((cell) => cell.trim()))
+          .split("\n")
+          .map((row) => row.split(",").map((cell) => cell.trim()))
           .filter((row) => row.length >= 3); // Allow rows with 3+ values (name, email, password required)
         if (rows.length <= 1) {
-          alert('CSV file must contain at least one data row after the header.');
+          alert(
+            "CSV file must contain at least one data row after the header."
+          );
           return;
         }
         setPreviewData(rows.slice(1)); // Skip the header row
@@ -63,34 +93,36 @@ const ManageTeachers: React.FC = () => {
   const addSingleTeacher = () => {
     if (
       singleTeacherForm.name &&
-      singleTeacherForm.email &&
-      singleTeacherForm.password
+      singleTeacherForm.email
     ) {
       addTeacher(
-        { ...singleTeacherForm, role: 'Teacher' },
+        { ...singleTeacherForm, role: "Teacher" },
         {
           onSuccess: () => {
-            setSingleTeacherForm({ name: '', email: '', password: '', phone_number: '' });
+            setSingleTeacherForm({
+              name: "",
+              email: "",
+              phone_number: "",
+            });
             setShowAddSingleModal(false);
           },
           onError: (err) => {
-            console.error('Add teacher failed:', err);
-            alert('Failed to add teacher: ' + err.message);
+            console.error("Add teacher failed:", err);
+            alert("Failed to add teacher: " + err.message);
           },
         }
       );
     } else {
-      alert('Please fill in all required fields.');
+      alert("Please fill in all required fields.");
     }
   };
 
   const addMultipleTeachersHandler = () => {
-    const users = previewData.map(([name, email, password, phone_number]) => ({
+    const users = previewData.map(([name, email, phone_number]) => ({
       name,
       email,
-      password,
       phone_number: phone_number || undefined,
-      role: 'Teacher',
+      role: "Teacher",
     }));
     addMultipleTeachers(
       { users },
@@ -100,8 +132,8 @@ const ManageTeachers: React.FC = () => {
           setShowAddMultipleModal(false);
         },
         onError: (err) => {
-          console.error('Add multiple teachers failed:', err);
-          alert('Failed to add teachers: ' + err.message);
+          console.error("Add multiple teachers failed:", err);
+          alert("Failed to add teachers: " + err.message);
         },
       }
     );
@@ -109,11 +141,11 @@ const ManageTeachers: React.FC = () => {
 
   const handleEdit = () => {
     if (selectedTeacher) {
-      console.log('Selected teacher for edit:', selectedTeacher);
+      console.log("Selected teacher for edit:", selectedTeacher);
       setEditForm({
         name: selectedTeacher.user.name,
         email: selectedTeacher.user.email,
-        phone_number: selectedTeacher.user.phone_number || '',
+        phone_number: selectedTeacher.user.phone_number || "",
       });
       setShowEditModal(true);
     }
@@ -122,23 +154,26 @@ const ManageTeachers: React.FC = () => {
   const submitEdit = () => {
     if (selectedTeacher) {
       const teacherId = selectedTeacher.user_id?.toString();
-      console.log(`Submitting edit for teacher ID: ${teacherId}, Data:`, editForm);
+      console.log(
+        `Submitting edit for teacher ID: ${teacherId}, Data:`,
+        editForm
+      );
       if (!teacherId || isNaN(Number(teacherId))) {
-        console.error('Invalid teacher ID:', teacherId);
-        alert('Invalid teacher ID');
+        console.error("Invalid teacher ID:", teacherId);
+        alert("Invalid teacher ID");
         return;
       }
       editTeacher(
         { teacherId, data: editForm },
         {
           onSuccess: () => {
-            console.log('Edit teacher successful');
+            console.log("Edit teacher successful");
             setShowEditModal(false);
             setSelectedTeacher(null);
           },
           onError: (err) => {
-            console.error('Edit teacher failed:', err);
-            alert('Failed to edit teacher: ' + err.message);
+            console.error("Edit teacher failed:", err);
+            alert("Failed to edit teacher: " + err.message);
           },
         }
       );
@@ -150,19 +185,19 @@ const ManageTeachers: React.FC = () => {
       const teacherId = selectedTeacher.user_id?.toString();
       console.log(`Deleting teacher ID: ${teacherId}`);
       if (!teacherId || isNaN(Number(teacherId))) {
-        console.error('Invalid teacher ID:', teacherId);
-        alert('Invalid teacher ID');
+        console.error("Invalid teacher ID:", teacherId);
+        alert("Invalid teacher ID");
         return;
       }
       deleteTeacher(teacherId, {
         onSuccess: () => {
-          console.log('Delete teacher successful');
+          console.log("Delete teacher successful");
           setShowConfirmDelete(false);
           setSelectedTeacher(null);
         },
         onError: (err) => {
-          console.error('Delete teacher failed:', err);
-          alert('Failed to delete teacher: ' + err.message);
+          console.error("Delete teacher failed:", err);
+          alert("Failed to delete teacher: " + err.message);
         },
       });
     }
@@ -170,120 +205,198 @@ const ManageTeachers: React.FC = () => {
 
   const displayTeachers = searchQuery ? searchedTeachers : teachers;
 
-  if (isLoading || isSearchLoading) return <p className="text-white">Loading...</p>;
-  if (error) return <p className="text-red-500">Error: {error.message}</p>;
+  if (isLoading || isSearchLoading) return <FullScreenSpinner />;
+  if (error) return <ErrorComponent message={`Error: ${error.message}`} onRetry={refetch} />;
 
   return (
-    <div className="p-4 bg-gray-900 text-white">
-      <div className="flex justify-between mb-4">
-        <select className="bg-gray-700 text-white p-2 rounded">
+    <div>
+      <div className="flex justify-between mb-4 gap-4">
+        <select className="bg-background-neutral text-neutral-text-secondary p-2 rounded-md">
           <option>All Teachers</option>
         </select>
         <button
-          onClick={() => setShowAddOptions((prev) => !prev)}
-          className="bg-blue-500 text-white p-2 rounded"
+          ref={addButtonRef}
+          onClick={() => setShowAddOptions(true)}
+          className="bg-primary-base rounded-md text-white p-2"
         >
           + Add Teacher
         </button>
       </div>
-      <div className="flex mb-4">
+      <div className="flex mb-4 bg-background-neutral mt-5 md:mt-10 text-neutral-text-secondary rounded-full px-4">
         <input
           type="text"
           placeholder="Search by name"
           value={inputQuery}
           onChange={handleSearchInput}
-          className="w-full p-2 bg-gray-700 text-white rounded-l"
+          className="w-full p-2 bg-background-neutral text-neutral-text-tertiary rounded-full"
         />
         <button
           onClick={handleSearchSubmit}
-          className="bg-blue-500 text-white p-2 rounded-r"
+          className="text-neutral-text-secondary p-2 rounded-full"
         >
-          Search
+          <Search />
         </button>
       </div>
-      {displayTeachers?.map((teacher) => (
+      {displayTeachers?.map((teacher, index) => (
         <div
           key={teacher.user_id}
-          className="bg-gray-800 p-2 mb-2 rounded flex justify-between items-center"
+          className="p-2 mb-2 rounded flex justify-between items-center"
         >
-          <span>
-            {teacher.user.name} - {teacher.user.email}
-          </span>
+          <div className="flex gap-3">
+            <img
+              src={teacherImages[index]}
+              alt=""
+              className="w-10 h-10 rounded-full bg-background-neutral object-cover border-1 border-background-neutral"
+            />
+            <div>
+              <ThemedText variant="h4">{teacher.user.name}</ThemedText>
+              <ThemedText variant="caption">{teacher.user.email}</ThemedText>
+            </div>
+          </div>
           <button
+            ref={ellipsisButtonRef}
             onClick={() => setSelectedTeacher(teacher)}
-            className="text-white text-xl"
+            className="text-neutral-text-secondary p-1 bg-background-neutral rounded-full"
           >
-            ...
+            <Ellipsis size={20} />
           </button>
         </div>
       ))}
-      {showAddOptions && (
-        <div className="mt-4 space-x-2">
+      {showAddOptions && !showAddSingleModal && !showAddMultipleModal && addButtonRef.current && (
+        <div
+          className="fixed bg-white p-4 rounded shadow-md z-20"
+          style={{
+            top: addButtonRef.current.getBoundingClientRect().bottom + window.scrollY + 5 + "px",
+            left: addButtonRef.current.getBoundingClientRect().left + window.scrollX + "px",
+          }}
+        >
           <button
             onClick={() => {
-              setShowAddSingleModal(true);
               setShowAddOptions(false);
+              setShowAddSingleModal(true);
             }}
-            className="bg-gray-600 text-white p-2 rounded"
+            className="block mb-2 text-left w-full text-black"
           >
             Add Single
           </button>
           <button
             onClick={() => {
-              setShowAddMultipleModal(true);
               setShowAddOptions(false);
+              setShowAddMultipleModal(true);
             }}
-            className="bg-gray-600 text-white p-2 rounded"
+            className="block text-left w-full text-black"
           >
             Add Multiple
+          </button>
+          <button
+            onClick={() => setShowAddOptions(false)}
+            className="block mt-2 text-gray-500 text-sm"
+          >
+            Close
+          </button>
+        </div>
+      )}
+      {selectedTeacher && !showEditModal && !showConfirmDelete && ellipsisButtonRef.current && (
+        <div
+          className="fixed bg-white p-4 rounded shadow-md z-20"
+          style={{
+            top: ellipsisButtonRef.current.getBoundingClientRect().bottom + window.scrollY + 5 + "px",
+            left: ellipsisButtonRef.current.getBoundingClientRect().left + window.scrollX + "px",
+          }}
+        >
+          <button
+            onClick={handleEdit}
+            className="block mb-2 text-left w-full text-black"
+          >
+            Edit
+          </button>
+          <button
+            onClick={() => setShowConfirmDelete(true)}
+            className="block text-left w-full text-red-600"
+          >
+            Delete
+          </button>
+          <button
+            onClick={() => setSelectedTeacher(null)}
+            className="block mt-2 text-gray-500 text-sm"
+          >
+            Close
           </button>
         </div>
       )}
       {showAddSingleModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
-          <div className="bg-white p-6 rounded shadow-md min-w-[300px]">
-            <h2 className="text-lg font-semibold mb-4">Add Single Teacher</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background-main p-6 rounded shadow-md min-w-[200px] w-[80%] max-w-[600px]">
+            <ThemedText variant="h2" className="mb-4">
+              Add Single Teacher
+            </ThemedText>
+            <label
+              htmlFor=""
+              className="text-sm text-neutral-text-secondary mb-2"
+            >
+              Name:
+            </label>
             <input
               type="text"
               value={singleTeacherForm.name}
-              onChange={(e) => setSingleTeacherForm({ ...singleTeacherForm, name: e.target.value })}
-              placeholder="Name"
-              className="w-full mb-2 p-2 border rounded text-black border-black"
+              onChange={(e) =>
+                setSingleTeacherForm({
+                  ...singleTeacherForm,
+                  name: e.target.value,
+                })
+              }
+              placeholder="Enter teacher name"
+              className="w-full p-2 rounded text-neutral-text-secondary bg-background-neutral mb-4"
               required
             />
+            <label
+              htmlFor=""
+              className="text-sm text-neutral-text-secondary mb-2"
+            >
+              Email:
+            </label>
             <input
               type="email"
               value={singleTeacherForm.email}
-              onChange={(e) => setSingleTeacherForm({ ...singleTeacherForm, email: e.target.value })}
+              onChange={(e) =>
+                setSingleTeacherForm({
+                  ...singleTeacherForm,
+                  email: e.target.value,
+                })
+              }
               placeholder="Email"
-              className="w-full mb-2 p-2 border rounded text-black border-black"
+              className="w-full p-2 rounded text-neutral-text-secondary bg-background-neutral mb-4"
               required
             />
-            <input
-              type="password"
-              value={singleTeacherForm.password}
-              onChange={(e) => setSingleTeacherForm({ ...singleTeacherForm, password: e.target.value })}
-              placeholder="Password"
-              className="w-full mb-2 p-2 border rounded text-black border-black"
-              required
-            />
+            <label
+              htmlFor=""
+              className="text-sm text-neutral-text-secondary mb-2"
+            >
+              Phone:
+            </label>
             <input
               type="text"
               value={singleTeacherForm.phone_number}
-              onChange={(e) => setSingleTeacherForm({ ...singleTeacherForm, phone_number: e.target.value })}
+              onChange={(e) =>
+                setSingleTeacherForm({
+                  ...singleTeacherForm,
+                  phone_number: e.target.value,
+                })
+              }
               placeholder="Phone Number (optional)"
-              className="w-full mb-4 p-2 border rounded"
+              className="w-full p-2 rounded text-neutral-text-secondary bg-background-neutral mb-4"
             />
             <div className="flex justify-end space-x-2">
               <button
                 onClick={() => setShowAddSingleModal(false)}
-                className="bg-gray-300 px-4 py-2 rounded"
+                className="px-4 py-2 rounded text-neutral-text-secondary"
               >
                 Cancel
               </button>
               <button
                 onClick={addSingleTeacher}
-                className="bg-blue-500 text-white px-4 py-2 rounded"
+                className="bg-primary-base text-white px-4 py-2 rounded-md"
+                disabled={isAddingSingleTeacher}
               >
                 Add
               </button>
@@ -292,56 +405,78 @@ const ManageTeachers: React.FC = () => {
         </div>
       )}
       {showAddMultipleModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
-          <div className="bg-white p-6 rounded shadow-md min-w-[400px] max-h-[80vh] overflow-auto">
-            <h2 className="text-lg font-semibold mb-4">Add Multiple Teachers</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background-main p-6 rounded shadow-md w-[80%] max-w-[600px] min-w-[200px] max-h-[80vh] overflow-auto">
+            <ThemedText variant="h2" className="mb-4">
+              Add Multiple Teachers
+            </ThemedText>
             <input
               type="file"
               accept=".csv"
               onChange={handleFileUpload}
-              className="mb-4"
+              className="mb-4 text-neutral-text-secondary bg-background-neutral px-2 py-2 rounded w-full"
             />
             {previewData.length > 0 ? (
               <>
-                <h4 className="text-md font-semibold mb-2">Preview</h4>
-                <div className="space-y-2 mb-4">
-                  {previewData.map(([name, email, password, phone_number], index) => (
-                    <div key={index} className="bg-gray-100 p-2 rounded">
-                      {name} - {email} {phone_number ? `- ${phone_number}` : ''}
-                    </div>
-                  ))}
+                <ThemedText variant="h4" className="mb-2">
+                  Preview ({previewData.length} teachers)
+                </ThemedText>
+                <div className="space-y-2 mb-4 max-h-[200px] overflow-y-auto">
+                  {previewData.map(
+                    ([name, email, phone_number], index) => (
+                      <div key={index} className="p-2">
+                        <div className="flex gap-3">
+                          <img
+                            src={teacherImages[index]}
+                            alt=""
+                            className="w-10 h-10 rounded-full bg-background-neutral object-cover border-1 border-background-neutral"
+                          />
+                          <div>
+                            <ThemedText variant="h4">{name}</ThemedText>
+                            <ThemedText variant="caption">{email}</ThemedText>
+                            <ThemedText variant="caption">
+                              {phone_number ? ` - ${phone_number}` : ""}
+                            </ThemedText>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  )}
                 </div>
                 <div className="flex justify-end space-x-2">
                   <button
                     onClick={() => setShowAddMultipleModal(false)}
-                    className="bg-gray-300 px-4 py-2 rounded"
+                    className="px-4 py-2 rounded text-neutral-text-secondary"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={addMultipleTeachersHandler}
-                    className="bg-blue-500 text-white px-4 py-2 rounded"
+                    className="bg-primary-base text-white px-4 py-2 rounded-md"
                   >
                     Add Teachers
                   </button>
                 </div>
               </>
             ) : (
-              <p className="text-sm text-gray-600">
-                Upload a CSV with header: <code>name,email,password,phone_number</code>
-              </p>
+              <ThemedText className="text-sm text-neutral-text-secondary">
+                Upload a CSV with header:{" "}
+                <code>name,email,phone_number</code>
+              </ThemedText>
             )}
           </div>
         </div>
       )}
       {showEditModal && selectedTeacher && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded shadow-md min-w-[300px]">
             <h2 className="text-lg font-semibold mb-4">Edit Teacher</h2>
             <input
               type="text"
               value={editForm.name}
-              onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+              onChange={(e) =>
+                setEditForm({ ...editForm, name: e.target.value })
+              }
               placeholder="Name"
               className="w-full mb-2 p-2 border rounded text-black border-black"
               required
@@ -349,7 +484,9 @@ const ManageTeachers: React.FC = () => {
             <input
               type="email"
               value={editForm.email}
-              onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+              onChange={(e) =>
+                setEditForm({ ...editForm, email: e.target.value })
+              }
               placeholder="Email"
               className="w-full mb-2 p-2 border rounded text-black border-black"
               required
@@ -357,7 +494,9 @@ const ManageTeachers: React.FC = () => {
             <input
               type="text"
               value={editForm.phone_number}
-              onChange={(e) => setEditForm({ ...editForm, phone_number: e.target.value })}
+              onChange={(e) =>
+                setEditForm({ ...editForm, phone_number: e.target.value })
+              }
               placeholder="Phone Number (optional)"
               className="w-full mb-4 p-2 border rounded"
             />
@@ -379,10 +518,11 @@ const ManageTeachers: React.FC = () => {
         </div>
       )}
       {showConfirmDelete && selectedTeacher && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-4 rounded shadow-md min-w-[300px] text-center">
             <p className="mb-4">
-              Are you sure you want to delete <strong>{selectedTeacher.user.name}</strong>?
+              Are you sure you want to delete{" "}
+              <strong>{selectedTeacher.user.name}</strong>?
             </p>
             <div className="flex justify-center space-x-4">
               <button
@@ -399,25 +539,6 @@ const ManageTeachers: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
-      )}
-      {selectedTeacher && !showEditModal && !showConfirmDelete && (
-        <div className="fixed bottom-10 right-10 bg-white p-4 rounded shadow-md z-20">
-          <button onClick={handleEdit} className="block mb-2 text-left w-full text-black">
-            Edit
-          </button>
-          <button
-            onClick={() => setShowConfirmDelete(true)}
-            className="block text-left w-full text-red-600"
-          >
-            Delete
-          </button>
-          <button
-            onClick={() => setSelectedTeacher(null)}
-            className="block mt-2 text-gray-500 text-sm"
-          >
-            Close
-          </button>
         </div>
       )}
     </div>

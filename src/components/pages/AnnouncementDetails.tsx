@@ -1,10 +1,42 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Component, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCommentSocket, useCreateComment, useGetComments } from '../../hooks/useComments';
-import { useCreatePoll, useGetAnnouncementDetails, useGetPollResponses, useRespondToPoll, useUpdateAnnouncement, useDeleteAnnouncement } from '../../hooks/useAnnouncements';
+import { useGetAnnouncementDetails, useGetPollResponses, useRespondToPoll, useUpdateAnnouncement, useDeleteAnnouncement } from '../../hooks/useAnnouncements';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '../../api/axios';
-import { MoreVertical } from 'lucide-react';
+import { MoreVertical, File, FileText, Image, X } from 'lucide-react';
+import ThemedText from '@/components/commons/typography/ThemedText';
+import BackHeader from '@/components/commons/navigation/BackHeader';
+import ContentContainer from '@/components/commons/containers/ContentContainer';
+import CommentList from '@/components/commons/lists/CommentList';
+import { getTimeAgo } from '@/utils/formatDate';
+
+// Error Boundary Component
+class ErrorBoundary extends Component {
+  state = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-4 text-error bg-background-neutral rounded">
+          <h2 className="text-xl font-bold">Something went wrong</h2>
+          <p>{this.state.error?.message || 'An unexpected error occurred.'}</p>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null })}
+            className="mt-4 px-4 py-2 bg-primary-base text-white rounded hover:bg-primary-dark"
+          >
+            Try Again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const AnnouncementDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -20,10 +52,8 @@ const AnnouncementDetails: React.FC = () => {
   useCommentSocket(announcementId);
 
   // Poll-related state and hooks
-  const { mutate: createPoll } = useCreatePoll();
   const { mutate: respondToPoll } = useRespondToPoll();
   const { data: pollResponses } = useGetPollResponses(announcement?.poll?.poll_id || 0);
-  const [pollForm, setPollForm] = useState({ allowMultipleAnswers: false });
   const { mutate: updateAnnouncement } = useUpdateAnnouncement();
   const { mutate: deleteAnnouncement } = useDeleteAnnouncement();
   const queryClient = useQueryClient();
@@ -31,17 +61,62 @@ const AnnouncementDetails: React.FC = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
+  const [editAttachments, setEditAttachments] = useState<string[]>([]);
+  const [newAttachment, setNewAttachment] = useState('');
+  const [attachmentSizes, setAttachmentSizes] = useState<{ [key: number]: string }>({});
+  const [selectedAttachment, setSelectedAttachment] = useState<{ url: string; originalName: string } | null>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (announcement?.attachments) {
+      const fetchSizes = async () => {
+        const sizes = {};
+        for (let i = 0; i < announcement.attachments.length; i++) {
+          const attachment = announcement.attachments[i];
+          try {
+            const response = await fetch(attachment.url, { method: 'HEAD' });
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const size = response.headers.get('content-length');
+            sizes[i] = size ? `${(parseInt(size) / 1024).toFixed(2)} KB` : 'Size unavailable (server-side fetch required)';
+            if (!size && attachment.url.match(/\.(pdf|docx)$/i)) {
+              console.warn(`No content-length for ${attachment.url}. Consider backend API for accurate size.`);
+            }
+          } catch (err) {
+            sizes[i] = 'Size unavailable (error fetching)';
+            console.error(`Error fetching size for ${attachment.url}:`, err);
+          }
+        }
+        setAttachmentSizes(sizes);
+      };
+      fetchSizes();
+    }
+  }, [announcement]);
 
   useEffect(() => {
     if (announcement) {
       setEditTitle(announcement.title || '');
       setEditContent(announcement.content || '');
+      setEditAttachments(announcement.attachments?.map((a) => a.url) || []);
     }
   }, [announcement]);
 
-  if (isLoading) return <p className="text-white p-4">Loading...</p>;
-  if (error) return <p className="text-red-500 p-4">{error.message}</p>;
-  if (!announcement) return <p className="text-white p-4">Announcement not found.</p>;
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  if (isLoading) return <ThemedText className="p-4">Loading...</ThemedText>;
+  if (error) return <ThemedText className="text-error p-4">{error.message}</ThemedText>;
+  if (!announcement) return <ThemedText className="p-4">Announcement not found.</ThemedText>;
 
   const handleAddComment = () => {
     if (newComment.trim() === '') return;
@@ -55,14 +130,6 @@ const AnnouncementDetails: React.FC = () => {
         onSuccess: () => setNewComment(''),
       }
     );
-  };
-
-  const handleCreatePoll = () => {
-    createPoll({
-      announcementId,
-      type: 'general',
-      allowMultipleAnswers: pollForm.allowMultipleAnswers,
-    });
   };
 
   const handlePollResponse = (optionId: number) => {
@@ -83,19 +150,40 @@ const AnnouncementDetails: React.FC = () => {
 
   const handleEdit = () => {
     setEditModalOpen(true);
+    setDropdownOpen(false);
   };
 
   const handleUpdate = () => {
     updateAnnouncement(
-      { announcementId, data: { title: editTitle, content: editContent } },
+      {
+        announcementId,
+        data: {
+          title: editTitle,
+          content: editContent,
+          attachments: editAttachments.map((url) => ({ url, originalName: url.split('/').pop() || 'attachment' })),
+        },
+      },
       {
         onSuccess: () => {
           queryClient.invalidateQueries(['announcements']);
           queryClient.invalidateQueries(['announcement', announcementId]);
           setEditModalOpen(false);
+          setEditAttachments([]);
+          setNewAttachment('');
         },
       }
     );
+  };
+
+  const addAttachment = () => {
+    if (newAttachment.trim()) {
+      setEditAttachments([...editAttachments, newAttachment]);
+      setNewAttachment('');
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setEditAttachments(editAttachments.filter((_, i) => i !== index));
   };
 
   const handleDelete = () => {
@@ -108,244 +196,366 @@ const AnnouncementDetails: React.FC = () => {
   };
 
   // Assume user role and ID are available (e.g., from auth context)
-  const isAdminOrSuperAdmin = true; // Replace with actual role check
   const currentUserId = 1; // Replace with actual user ID from auth
+  const isAdminOrSuperAdmin = true; // Replace with actual role check
 
   // Calculate vote counts for each option
-  const voteCounts = announcement.poll?.options?.reduce((acc, option) => {
-    acc[option.option_id] = pollResponses?.filter((r) => r.poll_option_id === option.option_id).length || 0;
+  const voteCounts = announcement.poll?.options?.reduce((acc, opt) => {
+    acc[opt.option_id] = pollResponses?.filter((r) => r.poll_option_id === opt.option_id).length || 0;
     return acc;
   }, {} as { [key: number]: number });
 
-  const totalVotes = announcement.poll?.options?.reduce((sum, option) => sum + (voteCounts?.[option.option_id] || 0), 0) || 0;
+  const totalVotes = announcement.poll?.options?.reduce((sum, opt) => sum + (voteCounts?.[opt.option_id] || 0), 0) || 0;
+
+  // Helper to determine icon and type based on file type
+  const getFileInfo = (url: string) => {
+    if (url.endsWith('.pdf')) return { icon: <FileText className="w-6 h-6 text-error" />, type: 'PDF' };
+    if (url.endsWith('.doc') || url.endsWith('.docx')) return { icon: <File className="w-6 h-6 text-blue-500" />, type: 'DOCX' };
+    if (url.match(/\.(jpeg|jpg|png|gif)$/i)) return { icon: <Image className="w-6 h-6 text-green-500" />, type: 'IMG' };
+    if (url.endsWith('.mp4') || url.endsWith('.mov')) return { icon: <File className="w-6 h-6 text-purple-500" />, type: 'VIDEO' };
+    return { icon: <File className="w-6 h-6 text-neutral-text-tertiary" />, type: 'UNKNOWN' };
+  };
+
+  const closeModal = () => setSelectedAttachment(null);
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <div className="flex justify-between items-start mb-6">
-        <button
-          onClick={() => navigate(-1)}
-          className="text-blue-400 hover:underline"
-        >
-          ← Back to announcements
-        </button>
-        {(isAdminOrSuperAdmin || announcement.admin.user_id === currentUserId) && (
-          <div className="relative">
-            <MoreVertical
-              size={20}
-              className="text-gray-400 cursor-pointer hover:text-white"
-              onClick={(e) => {
-                e.stopPropagation();
-                setEditModalOpen(false); // Close edit modal if open
-                setDeleteConfirmOpen(false); // Close delete modal if open
-              }}
+    <ErrorBoundary>
+      <ContentContainer>
+        <BackHeader title="Back to announcements" backUrl="/announcements" />
+        <div className="flex justify-between items-start mb-6 mt-6">
+          <div className="flex gap-2">
+            <img
+                                  src="../../src/assets/admins/valerie.jpg"
+
+              alt=""
+              className="w-10 h-10 rounded-full bg-background-neutral"
             />
-            {editModalOpen || deleteConfirmOpen ? null : (
-              <div className="absolute right-0 mt-2 w-48 bg-gray-700 rounded-md shadow-lg z-10">
-                {!announcement.is_poll && (
-                  <button
-                    onClick={handleEdit}
-                    className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-600 rounded-t-md"
-                  >
-                    Edit
-                  </button>
-                )}
-                <button
-                  onClick={() => setDeleteConfirmOpen(true)}
-                  className="w-full text-left px-4 py-2 text-red-400 hover:bg-gray-600 rounded-b-md"
+            <div className="flex-1">
+              <ThemedText variant="h4">{announcement.admin.user.name}</ThemedText>
+              <ThemedText variant="caption" className="text-neutral-text-tertiary">
+                {getTimeAgo(announcement.created_at)}
+              </ThemedText>
+            </div>
+          </div>
+          {(isAdminOrSuperAdmin || announcement.admin.user_id === currentUserId) && (
+            <div className="relative" onClick={(e) => e.stopPropagation()} ref={dropdownRef}>
+              <button
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className="text-neutral-text-secondary hover:text-primary-base p-2"
+              >
+                <MoreVertical className="h-5 w-5" />
+              </button>
+              {dropdownOpen && (
+                <div className="absolute right-0 mt-2 w-32 bg-background-neutral border border-neutral-border rounded-md shadow-lg z-10">
+                  <div className="py-1">
+                    {!announcement.is_poll && (
+                      <button
+                        onClick={handleEdit}
+                        className="block w-full text-left px-4 py-2 text-sm text-neutral-text-secondary"
+                      >
+                        Edit
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setDeleteConfirmOpen(true);
+                        setDropdownOpen(false);
+                      }}
+                      className="block w-full text-left px-4 py-2 text-sm text-error"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="mb-6">
+          <ThemedText variant="h2" className="text-xl mb-2 text-neutral-text-primary">{announcement.title}</ThemedText>
+          <ThemedText>{announcement.content || 'No details provided.'}</ThemedText>
+        </div>
+        {announcement.attachments?.length > 0 && (
+          <div className="mb-6">
+            {announcement.attachments.map((attachment, index) => {
+              const fileName = attachment.originalName || attachment.url.split('/').pop()?.split('?')[0] || `file_${index}`;
+              const { icon, type } = getFileInfo(attachment.url);
+              return (
+                <div
+                  key={index}
+                  className="flex mb-2 cursor-pointer w-fit"
+                  onClick={() => setSelectedAttachment(attachment)}
                 >
-                  Delete
-                </button>
+                  {icon}
+                  <div className="ml-3 flex-1">
+                    <a
+                      href={attachment.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-neutral-text-secondary text-sm"
+                    >
+                      {fileName}
+                    </a>
+                    <div className="flex gap-5 items-center">
+                      <ThemedText className="text-xs text-neutral-text-tertiary">
+                        {type.toLowerCase()}
+                      </ThemedText>
+                      {type.toLowerCase() !== 'video' && type.toLowerCase() !== 'img' && (
+                        <ThemedText className="text-xs text-neutral-text-tertiary">
+                          {12} pages
+                        </ThemedText>
+                      )}
+                      <ThemedText className="text-xs text-neutral-text-tertiary">
+                        {attachmentSizes[index] || 'Loading...'}
+                      </ThemedText>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Modal for Viewing Attachments */}
+        {selectedAttachment && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
+            onClick={closeModal}
+          >
+            <div
+              className="relative bg-background-neutral p-6 rounded-lg max-w-4xl w-full h-[90vh] overflow-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={closeModal}
+                className="absolute top-2 right-2 text-neutral-text-secondary text-2xl font-bold hover:text-neutral-text-primary"
+              >
+                ×
+              </button>
+              {selectedAttachment.url.match(/\.(jpeg|jpg|png|gif)$/i) ? (
+                <img
+                  src={selectedAttachment.url}
+                  alt={selectedAttachment.originalName}
+                  className="max-w-full max-h-full object-contain"
+                />
+              ) : selectedAttachment.url.endsWith('.pdf') ? (
+                <iframe
+                  src={selectedAttachment.url}
+                  title="PDF Viewer"
+                  className="w-full h-full"
+                />
+              ) : (
+                <div className="text-neutral-text-secondary text-center">
+                  <p>Preview not available for {selectedAttachment.originalName}. Download to view.</p>
+                  <a
+                    href={selectedAttachment.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary-base hover:underline"
+                  >
+                    Download
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Poll Section */}
+        {announcement.is_poll && announcement.poll && (
+          <div className="mb-6">
+            <ThemedText variant="h2" className="text-xl mb-4">Poll: {announcement.poll.type}</ThemedText>
+            {announcement.poll.options?.map((opt) => {
+              const votes = voteCounts?.[opt.option_id] || 0;
+              const percentage = totalVotes > 0 ? (votes / totalVotes) * 100 : 0;
+              const hasVoted = pollResponses?.some(
+                (r) => r.user_id === currentUserId && r.poll_option_id === opt.option_id
+              );
+              return (
+                <div key={opt.option_id} className="mb-2">
+                  <label className="flex items-center space-x-2 text-neutral-text-secondary">
+                    {announcement.poll.allow_multiple_answers ? (
+                      <input
+                        type="checkbox"
+                        checked={hasVoted}
+                        onChange={() => handlePollResponse(opt.option_id)}
+                        className="h-4 w-4 text-primary-base bg-background-neutral border-neutral-border rounded"
+                      />
+                    ) : (
+                      <input
+                        type="radio"
+                        name="pollOption"
+                        checked={hasVoted}
+                        onChange={() => handlePollResponse(opt.option_id)}
+                        className="h-4 w-4 text-primary-base bg-background-neutral border-neutral-border rounded"
+                      />
+                    )}
+                    <span>{opt.content}</span>
+                  </label>
+                  <div className="w-full bg-background-neutral rounded-full h-2.5 mt-1">
+                    <div
+                      className="bg-primary-base h-2.5 rounded-full"
+                      style={{ width: `${percentage}%` }}
+                    ></div>
+                  </div>
+                  <ThemedText variant="caption">{votes} votes</ThemedText>
+                </div>
+              );
+            })}
+            {isAdminOrSuperAdmin && pollResponses && (
+              <div className="mt-4">
+                <ThemedText variant="h3">Responses</ThemedText>
+                {pollResponses.map((response) => (
+                  <ThemedText key={response.response_id} className="text-neutral-text-secondary">
+                    {response.user.name} responded at{' '}
+                    {new Date(response.responded_at).toLocaleString()}
+                  </ThemedText>
+                ))}
               </div>
             )}
           </div>
         )}
-      </div>
-      <h1 className="text-3xl font-bold text-white mb-2">{announcement.title}</h1>
-      <p className="text-gray-400 mb-4">
-        By {announcement.admin.user.name} on{' '}
-        {new Date(announcement.created_at).toLocaleDateString()}
-      </p>
-      {/* Display assignment details */}
-      <div className="text-gray-300 mb-6">
-        <h2 className="text-xl font-semibold mb-2">Assignment Details</h2>
-        <p>{announcement.content || 'No details provided.'}</p>
-      </div>
-      {announcement.attachments?.length > 0 && (
-        <p className="text-blue-400 mb-6">{announcement.attachments.length} attachments</p>
-      )}
 
-      {/* Poll Section */}
-      {announcement.is_poll && announcement.poll && (
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold text-white mb-4">Poll: {announcement.poll.type}</h2>
-          {announcement.poll.options?.map((option) => {
-            const votes = voteCounts?.[option.option_id] || 0;
-            const percentage = totalVotes > 0 ? (votes / totalVotes) * 100 : 0;
-            const hasVoted = pollResponses?.some((r) => r.user_id === currentUserId && r.poll_option_id === option.option_id);
-            return (
-              <div key={option.option_id} className="mb-2">
-                <label className="flex items-center space-x-2 text-gray-300">
-                  {announcement.poll.allow_multiple_answers ? (
-                    <input
-                      type="checkbox"
-                      checked={hasVoted}
-                      onChange={() => handlePollResponse(option.option_id)}
-                      className="h-4 w-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
-                    />
-                  ) : (
-                    <input
-                      type="radio"
-                      name="pollOption"
-                      checked={hasVoted}
-                      onChange={() => handlePollResponse(option.option_id)}
-                      className="h-4 w-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
-                    />
-                  )}
-                  <span>{option.content}</span>
-                </label>
-                <div className="w-full bg-gray-700 rounded-full h-2.5 mt-1">
-                  <div
-                    className="bg-blue-600 h-2.5 rounded-full"
-                    style={{ width: `${percentage}%` }}
-                  ></div>
-                </div>
-                <span className="text-sm text-gray-400">{votes} votes</span>
-              </div>
-            );
-          })}
-          {isAdminOrSuperAdmin && pollResponses && (
-            <div className="mt-4">
-              <h3 className="text-lg font-semibold text-white">Responses</h3>
-              {pollResponses.map((response) => (
-                <p key={response.response_id} className="text-gray-300">
-                  {response.user.name} responded at{' '}
-                  {new Date(response.responded_at).toLocaleString()}
-                </p>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Poll Creation (Admin/SuperAdmin only) */}
-      {!announcement.is_poll && isAdminOrSuperAdmin && (
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold text-white mb-4">Create Poll</h2>
-          <label className="flex items-center space-x-2 mb-4">
-            <input
-              type="checkbox"
-              checked={pollForm.allowMultipleAnswers}
-              onChange={(e) =>
-                setPollForm({ ...pollForm, allowMultipleAnswers: e.target.checked })
-              }
-              className="h-4 w-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
-            />
-            <span className="text-white">Allow multiple answers</span>
-          </label>
-          <button
-            onClick={handleCreatePoll}
-            className="bg-blue-500 px-4 py-2 rounded text-white hover:bg-blue-700"
-            disabled={isLoading}
-          >
-            Create Poll
-          </button>
-        </div>
-      )}
-
-      {/* Edit Modal */}
-      {editModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gray-800 p-6 rounded-lg w-96">
-            <h2 className="text-xl font-semibold text-white mb-4">Edit Announcement</h2>
+        {/* Comments Section */}
+        <div className="mb-8">
+          <ThemedText className="text-neutral-text-secondary mb-4 pt-6 border-t border-neutral-border">
+            Comments ({announcement._count?.comments || 0})
+          </ThemedText>
+          <CommentList
+            comments={comments}
+            isLoading={commentsLoading}
+            totalComments={announcement._count?.comments || 0}
+          />
+          <div className="flex items-center space-x-3 mt-8">
             <input
               type="text"
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-              className="w-full px-3 py-2 mb-4 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Title"
+              placeholder="Add a comment"
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              className="flex-1 px-3 py-2 bg-background-neutral rounded-[100px] text-neutral-text-secondary text-sm border border-neutral-border"
             />
-            <textarea
-              value={editContent}
-              onChange={(e) => setEditContent(e.target.value)}
-              className="w-full px-3 py-2 mb-4 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Assignment Details"
-              rows={4}
-            />
-            <div className="flex justify-end space-x-4">
+            {!!newComment && (
               <button
-                onClick={() => setEditModalOpen(false)}
-                className="px-4 py-2 text-gray-300 hover:text-white"
+                onClick={handleAddComment}
+                className="flex justify-center items-center bg-primary-base rounded-full w-9 h-9 text-white pl-1 hover:bg-primary-dark"
+                disabled={!newComment.trim() || isLoading}
               >
-                Cancel
+                <span className="material-icons">send</span>
               </button>
-              <button
-                onClick={handleUpdate}
-                className="px-4 py-2 bg-blue-500 rounded text-white hover:bg-blue-700"
-              >
-                Save
-              </button>
-            </div>
+            )}
           </div>
         </div>
-      )}
 
-      {/* Delete Confirmation Modal */}
-      {deleteConfirmOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gray-800 p-6 rounded-lg w-96 text-center">
-            <p className="text-white mb-4">Are you sure you want to delete this announcement?</p>
-            <div className="flex justify-center space-x-4">
-              <button
-                onClick={() => setDeleteConfirmOpen(false)}
-                className="px-4 py-2 text-gray-300 hover:text-white"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                className="px-4 py-2 bg-red-500 rounded text-white hover:bg-red-700"
-              >
-                Delete
-              </button>
+        {/* Edit Modal */}
+        {editModalOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-background-main p-6 rounded-lg w-96">
+              <ThemedText variant="h2" className="text-xl mb-4 text-neutral-text-secondary">
+                Edit Announcement
+              </ThemedText>
+              <div className="mb-4">
+                <label className="block text-sm text-neutral-text-secondary mb-1">Title</label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full px-3 py-2 bg-background-neutral border border-neutral-border rounded-md text-neutral-text-secondary"
+                  placeholder="Enter title"
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm text-neutral-text-secondary mb-1">Content</label>
+                <textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="w-full px-3 py-2 bg-background-neutral border border-neutral-border rounded-md text-neutral-text-secondary"
+                  placeholder="Enter content"
+                  rows={4}
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm text-neutral-text-secondary mb-1">Attachments</label>
+                {editAttachments.map((url, index) => (
+                  <div key={index} className="flex items-center mb-2">
+                    <input
+                      type="text"
+                      value={url}
+                      onChange={(e) => {
+                        const newAttachments = [...editAttachments];
+                        newAttachments[index] = e.target.value;
+                        setEditAttachments(newAttachments);
+                      }}
+                      className="flex-1 px-3 py-2 bg-background-neutral border border-neutral-border rounded-md text-neutral-text-secondary"
+                      placeholder="Enter attachment URL"
+                    />
+                    <button
+                      onClick={() => removeAttachment(index)}
+                      className="ml-2 text-error hover:text-error-dark"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                ))}
+                <div className="flex items-center">
+                  <input
+                    type="text"
+                    value={newAttachment}
+                    onChange={(e) => setNewAttachment(e.target.value)}
+                    className="flex-1 px-3 py-2 bg-background-neutral border border-neutral-border rounded-md text-neutral-text-secondary"
+                    placeholder="Enter new attachment URL"
+                  />
+                  <button
+                    onClick={addAttachment}
+                    className="ml-2 px-3 py-2 bg-primary-base text-white rounded-md hover:bg-primary-dark"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+              <div className="flex justify-end space-x-4">
+                <button
+                  onClick={() => setEditModalOpen(false)}
+                  className="px-4 py-2 text-neutral-text-secondary hover:text-neutral-text-primary"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUpdate}
+                  className="px-4 py-2 bg-primary-base rounded text-white hover:bg-primary-dark"
+                >
+                  Save
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold text-white mb-4">
-          Comments ({announcement._count?.comments || 0})
-        </h2>
-        {commentsLoading && <p className="text-gray-400 mb-4">Loading comments...</p>}
-        {!comments?.length && (
-          <p className="text-gray-400 mb-4">No comments yet. Be the first to comment!</p>
         )}
-        <ul className="space-y-4 mb-4">
-          {comments?.map((c) => (
-            <li key={c.comment_id} className="bg-gray-700 p-3 rounded">
-              <p className="text-white font-semibold">{c.user.name}</p>
-              <p className="text-gray-300">{c.content}</p>
-            </li>
-          ))}
-        </ul>
-        <div className="flex space-x-3">
-          <input
-            type="text"
-            placeholder="Add a comment"
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            onClick={handleAddComment}
-            className="bg-blue-500 px-4 py-2 rounded text-white hover:bg-blue-700"
-            disabled={!newComment.trim() || isLoading}
-          >
-            Submit
-          </button>
-        </div>
-      </div>
-    </div>
+
+        {/* Delete Confirmation Modal */}
+        {deleteConfirmOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-background-main p-6 rounded-lg w-96 text-center">
+              <ThemedText className="text-neutral-text-secondary mb-4">
+                Are you sure you want to delete this announcement?
+              </ThemedText>
+              <div className="flex justify-center space-x-4">
+                <button
+                  onClick={() => setDeleteConfirmOpen(false)}
+                  className="px-4 py-2 text-neutral-text-secondary hover:text-neutral-text-primary"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="px-4 py-2 bg-error rounded text-white hover:bg-error-dark"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </ContentContainer>
+    </ErrorBoundary>
   );
 };
 

@@ -11,7 +11,7 @@ const api: AxiosInstance = axios.create({
 
 // Store tokens in localStorage (or use a more secure method in production)
 export const getAccessToken = () => localStorage.getItem("accessToken");
-export const getRefreshToken = () => localStorage.getItem("refreshToken");
+export const getRefreshToken  = () => localStorage.getItem("refreshToken");
 export const setTokens = (accessToken: string, refreshToken: string) => {
   localStorage.setItem("accessToken", accessToken);
   localStorage.setItem("refreshToken", refreshToken);
@@ -44,7 +44,7 @@ api.interceptors.response.use(
       !originalRequest._retry
     ) {
       originalRequest._retry = true;
-      const refreshToken = getRefreshToken();
+      const refreshToken = await getRefreshToken();
       if (refreshToken) {
         try {
           console.log("refreshing tokenss....");

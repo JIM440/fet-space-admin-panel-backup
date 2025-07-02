@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { login, setTokens, clearTokens } from '../api/authApi';
+import { login, setTokens, setIsSuperAdmin, clearTokens } from '../api/authApi';
 import { useAuth } from '../context/AuthContext';
 import type { LoginCredentials, LoginResponse } from '../api/authApi';
 
@@ -10,6 +10,9 @@ export const useLogin = () => {
     onSuccess: (data) => {
       setTokens(data.accessToken, data.refreshToken);
       setAuth(data.user.role);
+      alert(JSON.stringify(data.user.admin.is_super_admin));
+
+      setIsSuperAdmin(data.user.admin.is_super_admin);
     },
     onError: (error) => {
       console.error('Login failed:', error);
