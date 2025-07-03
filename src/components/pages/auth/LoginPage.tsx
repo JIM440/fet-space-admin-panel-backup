@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useLogin } from "../../../hooks/useAuth";
 import ThemedText from "../../commons/typography/ThemedText";
+import { Button } from "@/components/ui/button";
 
 const LoginPage: React.FC = () => {
   const [identifier, setIdentifier] = useState("");
@@ -61,27 +62,27 @@ const LoginPage: React.FC = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Role</label>
+            {/* <label className="block text-sm font-medium text-neutral-text-secondary mb-2">Role:</label>
             <select
               value={role}
               onChange={(e) =>
                 setRole(e.target.value as 'Admin' | 'SuperAdmin' | 'Student' | 'Teacher')
               }
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 bg-background-neutral rounded-md text-neutral-text-secondary"
             >
               <option value="Student">Student</option>
               <option value="Teacher">Teacher</option>
               <option value="Admin">Admin</option>
               <option value="SuperAdmin">SuperAdmin</option>
-            </select>
+            </select> */}
           </div>
-          <button
+          <Button
             type="submit"
             disabled={isPending}
             className="w-full bg-primary-base rounded-md"
           >
             {isPending ? "Logging in..." : "Login"}
-          </button>
+          </Button>
         </form>
       </div>
     </div>

@@ -10,8 +10,6 @@ export const useLogin = () => {
     onSuccess: (data) => {
       setTokens(data.accessToken, data.refreshToken);
       setAuth(data.user.role);
-      alert(JSON.stringify(data.user.admin.is_super_admin));
-
       setIsSuperAdmin(data.user.admin.is_super_admin);
     },
     onError: (error) => {

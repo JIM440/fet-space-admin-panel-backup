@@ -29,12 +29,17 @@ const ManageTeachers: React.FC = () => {
   const [limit] = useState(10);
   const [searchQuery, setSearchQuery] = useState("");
   const [inputQuery, setInputQuery] = useState("");
-  const { data: teachers, isLoading, error, refetch } = useGetTeachers(page, limit);
+  const {
+    data: teachers,
+    isLoading,
+    error,
+    refetch,
+  } = useGetTeachers(page, limit);
   const { data: searchedTeachers, isLoading: isSearchLoading } =
     useSearchTeachers(searchQuery);
   const { mutate: addTeacher, isPending: isAddingSingleTeacher } =
     useAddTeacher();
-  const { mutate: addMultipleTeachers } = useAddMultipleTeachers();
+  const { mutate: addMultipleTeachers, isPending: isAddingMultipleTeachers } = useAddMultipleTeachers();
   const { mutate: editTeacher } = useEditTeacher();
   const { mutate: deleteTeacher } = useDeleteTeacher();
 
@@ -91,10 +96,7 @@ const ManageTeachers: React.FC = () => {
   };
 
   const addSingleTeacher = () => {
-    if (
-      singleTeacherForm.name &&
-      singleTeacherForm.email
-    ) {
+    if (singleTeacherForm.name && singleTeacherForm.email) {
       addTeacher(
         { ...singleTeacherForm, role: "Teacher" },
         {
@@ -206,7 +208,10 @@ const ManageTeachers: React.FC = () => {
   const displayTeachers = searchQuery ? searchedTeachers : teachers;
 
   if (isLoading || isSearchLoading) return <FullScreenSpinner />;
-  if (error) return <ErrorComponent message={`Error: ${error.message}`} onRetry={refetch} />;
+  if (error)
+    return (
+      <ErrorComponent message={`Error: ${error.message}`} onRetry={refetch} />
+    );
 
   return (
     <div>
@@ -237,6 +242,9 @@ const ManageTeachers: React.FC = () => {
           <Search />
         </button>
       </div>
+      <ThemedText variant="h3" className="mb-4 ml-2">
+        {displayTeachers.length || 0} Teachers
+      </ThemedText>
       {displayTeachers?.map((teacher, index) => (
         <div
           key={teacher.user_id}
@@ -262,68 +270,88 @@ const ManageTeachers: React.FC = () => {
           </button>
         </div>
       ))}
-      {showAddOptions && !showAddSingleModal && !showAddMultipleModal && addButtonRef.current && (
-        <div
-          className="fixed bg-white p-4 rounded shadow-md z-20"
-          style={{
-            top: addButtonRef.current.getBoundingClientRect().bottom + window.scrollY + 5 + "px",
-            left: addButtonRef.current.getBoundingClientRect().left + window.scrollX + "px",
-          }}
-        >
-          <button
-            onClick={() => {
-              setShowAddOptions(false);
-              setShowAddSingleModal(true);
+      {showAddOptions &&
+        !showAddSingleModal &&
+        !showAddMultipleModal &&
+        addButtonRef.current && (
+          <div
+            className="fixed bg-white p-4 rounded shadow-md z-20"
+            style={{
+              top:
+                addButtonRef.current.getBoundingClientRect().bottom +
+                window.scrollY +
+                5 +
+                "px",
+              left:
+                addButtonRef.current.getBoundingClientRect().left +
+                window.scrollX +
+                "px",
             }}
-            className="block mb-2 text-left w-full text-black"
           >
-            Add Single
-          </button>
-          <button
-            onClick={() => {
-              setShowAddOptions(false);
-              setShowAddMultipleModal(true);
+            <button
+              onClick={() => {
+                setShowAddOptions(false);
+                setShowAddSingleModal(true);
+              }}
+              className="block mb-2 text-left w-full text-black"
+            >
+              Add Single
+            </button>
+            <button
+              onClick={() => {
+                setShowAddOptions(false);
+                setShowAddMultipleModal(true);
+              }}
+              className="block text-left w-full text-black"
+            >
+              Add Multiple
+            </button>
+            <button
+              onClick={() => setShowAddOptions(false)}
+              className="block mt-2 text-gray-500 text-sm"
+            >
+              Close
+            </button>
+          </div>
+        )}
+      {selectedTeacher &&
+        !showEditModal &&
+        !showConfirmDelete &&
+        ellipsisButtonRef.current && (
+          <div
+            className="fixed bg-white p-4 rounded shadow-md z-20"
+            style={{
+              top:
+                ellipsisButtonRef.current.getBoundingClientRect().bottom +
+                window.scrollY +
+                5 +
+                "px",
+              left:
+                ellipsisButtonRef.current.getBoundingClientRect().left +
+                window.scrollX +
+                "px",
             }}
-            className="block text-left w-full text-black"
           >
-            Add Multiple
-          </button>
-          <button
-            onClick={() => setShowAddOptions(false)}
-            className="block mt-2 text-gray-500 text-sm"
-          >
-            Close
-          </button>
-        </div>
-      )}
-      {selectedTeacher && !showEditModal && !showConfirmDelete && ellipsisButtonRef.current && (
-        <div
-          className="fixed bg-white p-4 rounded shadow-md z-20"
-          style={{
-            top: ellipsisButtonRef.current.getBoundingClientRect().bottom + window.scrollY + 5 + "px",
-            left: ellipsisButtonRef.current.getBoundingClientRect().left + window.scrollX + "px",
-          }}
-        >
-          <button
-            onClick={handleEdit}
-            className="block mb-2 text-left w-full text-black"
-          >
-            Edit
-          </button>
-          <button
-            onClick={() => setShowConfirmDelete(true)}
-            className="block text-left w-full text-red-600"
-          >
-            Delete
-          </button>
-          <button
-            onClick={() => setSelectedTeacher(null)}
-            className="block mt-2 text-gray-500 text-sm"
-          >
-            Close
-          </button>
-        </div>
-      )}
+            <button
+              onClick={handleEdit}
+              className="block mb-2 text-left w-full text-black"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => setShowConfirmDelete(true)}
+              className="block text-left w-full text-red-600"
+            >
+              Delete
+            </button>
+            <button
+              onClick={() => setSelectedTeacher(null)}
+              className="block mt-2 text-gray-500 text-sm"
+            >
+              Close
+            </button>
+          </div>
+        )}
       {showAddSingleModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-background-main p-6 rounded shadow-md min-w-[200px] w-[80%] max-w-[600px]">
@@ -422,26 +450,24 @@ const ManageTeachers: React.FC = () => {
                   Preview ({previewData.length} teachers)
                 </ThemedText>
                 <div className="space-y-2 mb-4 max-h-[200px] overflow-y-auto">
-                  {previewData.map(
-                    ([name, email, phone_number], index) => (
-                      <div key={index} className="p-2">
-                        <div className="flex gap-3">
-                          <img
-                            src={teacherImages[index]}
-                            alt=""
-                            className="w-10 h-10 rounded-full bg-background-neutral object-cover border-1 border-background-neutral"
-                          />
-                          <div>
-                            <ThemedText variant="h4">{name}</ThemedText>
-                            <ThemedText variant="caption">{email}</ThemedText>
-                            <ThemedText variant="caption">
-                              {phone_number ? ` - ${phone_number}` : ""}
-                            </ThemedText>
-                          </div>
+                  {previewData.map(([name, email, phone_number], index) => (
+                    <div key={index} className="p-2">
+                      <div className="flex gap-3">
+                        <img
+                          src={teacherImages[index]}
+                          alt=""
+                          className="w-10 h-10 rounded-full bg-background-neutral object-cover border-1 border-background-neutral"
+                        />
+                        <div>
+                          <ThemedText variant="h4">{name}</ThemedText>
+                          <ThemedText variant="caption">{email}</ThemedText>
+                          <ThemedText variant="caption">
+                            {phone_number ? ` - ${phone_number}` : ""}
+                          </ThemedText>
                         </div>
                       </div>
-                    )
-                  )}
+                    </div>
+                  ))}
                 </div>
                 <div className="flex justify-end space-x-2">
                   <button
@@ -453,6 +479,7 @@ const ManageTeachers: React.FC = () => {
                   <button
                     onClick={addMultipleTeachersHandler}
                     className="bg-primary-base text-white px-4 py-2 rounded-md"
+                    disabled={isAddingMultipleTeachers}
                   >
                     Add Teachers
                   </button>
@@ -460,8 +487,7 @@ const ManageTeachers: React.FC = () => {
               </>
             ) : (
               <ThemedText className="text-sm text-neutral-text-secondary">
-                Upload a CSV with header:{" "}
-                <code>name,email,phone_number</code>
+                Upload a CSV with header: <code>name,email,phone_number</code>
               </ThemedText>
             )}
           </div>

@@ -16,6 +16,7 @@ import AddCommentInput from "../commons/inputs/AddCommentInput";
 import { getTimeAgo } from "@/utils/formatDate";
 import { Button } from "../ui/button";
 import { useAuth } from "@/context/AuthContext";
+import ContentContainer from "../commons/containers/ContentContainer";
 
 const Announcements: React.FC = () => {
   useAnnouncementSocket();
@@ -84,7 +85,37 @@ const Announcements: React.FC = () => {
   if (isLoading) return <FullScreenSpinner />;
   if (error) return <p className="text-error">{error.message}</p>;
   if (!announcements?.length)
-    return <ThemedText>No announcements found.</ThemedText>;
+    return <ContentContainer>
+          <div className="flex gap-2 justify-between items-center mb-5">
+        <ThemedText variant="h2">Announcements</ThemedText>
+
+        <Button
+          className="bg-primary-base hidden sm:block"
+          onClick={() => {
+            navigate("/create-announcement");
+          }}
+        >
+          + Create Announcement
+        </Button>
+        <Button
+          className="bg-primary-base sm:hidden"
+          onClick={() => {
+            navigate("/create-announcement");
+          }}
+        >
+          + Create
+        </Button>
+        {/* <button
+          onClick={() => {
+            navigate("/create-announcement");
+          }}
+          className="fixed bottom-4 md:bottom-6 right-6 md:right-20 bg-primary-base text-white p-3 rounded-full shadow-md h-12 z-50"
+        >
+          <Plus />
+        </button> */}
+      </div>
+    <ThemedText>No announcements found.</ThemedText>;
+    </ContentContainer>
 
   const handlePollResponse = (
     announcementId: number,

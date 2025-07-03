@@ -1,15 +1,25 @@
-import React, { useState, useEffect, Component, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useCommentSocket, useCreateComment, useGetComments } from '../../hooks/useComments';
-import { useGetAnnouncementDetails, useGetPollResponses, useRespondToPoll, useUpdateAnnouncement, useDeleteAnnouncement } from '../../hooks/useAnnouncements';
-import { useQueryClient } from '@tanstack/react-query';
-import api from '../../api/axios';
-import { MoreVertical, File, FileText, Image, X } from 'lucide-react';
-import ThemedText from '@/components/commons/typography/ThemedText';
-import BackHeader from '@/components/commons/navigation/BackHeader';
-import ContentContainer from '@/components/commons/containers/ContentContainer';
-import CommentList from '@/components/commons/lists/CommentList';
-import { getTimeAgo } from '@/utils/formatDate';
+import React, { useState, useEffect, Component, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import {
+  useCommentSocket,
+  useCreateComment,
+  useGetComments,
+} from "../../hooks/useComments";
+import {
+  useGetAnnouncementDetails,
+  useGetPollResponses,
+  useRespondToPoll,
+  useUpdateAnnouncement,
+  useDeleteAnnouncement,
+} from "../../hooks/useAnnouncements";
+import { useQueryClient } from "@tanstack/react-query";
+import api from "../../api/axios";
+import { MoreVertical, File, FileText, Image, X } from "lucide-react";
+import ThemedText from "@/components/commons/typography/ThemedText";
+import BackHeader from "@/components/commons/navigation/BackHeader";
+import ContentContainer from "@/components/commons/containers/ContentContainer";
+import CommentList from "@/components/commons/lists/CommentList";
+import { getTimeAgo } from "@/utils/formatDate";
 
 // Error Boundary Component
 class ErrorBoundary extends Component {
@@ -24,7 +34,7 @@ class ErrorBoundary extends Component {
       return (
         <div className="p-4 text-error bg-background-neutral rounded">
           <h2 className="text-xl font-bold">Something went wrong</h2>
-          <p>{this.state.error?.message || 'An unexpected error occurred.'}</p>
+          <p>{this.state.error?.message || "An unexpected error occurred."}</p>
           <button
             onClick={() => this.setState({ hasError: false, error: null })}
             className="mt-4 px-4 py-2 bg-primary-base text-white rounded hover:bg-primary-dark"
@@ -41,30 +51,41 @@ class ErrorBoundary extends Component {
 const AnnouncementDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const announcementId = parseInt(id || '0');
-  const { data: announcement, isLoading, error } = useGetAnnouncementDetails(announcementId);
+  const announcementId = parseInt(id || "0");
+  const {
+    data: announcement,
+    isLoading,
+    error,
+  } = useGetAnnouncementDetails(announcementId);
   const { data: comments, isLoading: commentsLoading } = useGetComments(
-    'generalAnnouncement',
+    "generalAnnouncement",
     announcementId
   );
   const { mutate: addComment } = useCreateComment();
-  const [newComment, setNewComment] = useState('');
+  const [newComment, setNewComment] = useState("");
   useCommentSocket(announcementId);
 
   // Poll-related state and hooks
   const { mutate: respondToPoll } = useRespondToPoll();
-  const { data: pollResponses } = useGetPollResponses(announcement?.poll?.poll_id || 0);
+  const { data: pollResponses } = useGetPollResponses(
+    announcement?.poll?.poll_id || 0
+  );
   const { mutate: updateAnnouncement } = useUpdateAnnouncement();
   const { mutate: deleteAnnouncement } = useDeleteAnnouncement();
   const queryClient = useQueryClient();
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [editTitle, setEditTitle] = useState('');
-  const [editContent, setEditContent] = useState('');
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
   const [editAttachments, setEditAttachments] = useState<string[]>([]);
-  const [newAttachment, setNewAttachment] = useState('');
-  const [attachmentSizes, setAttachmentSizes] = useState<{ [key: number]: string }>({});
-  const [selectedAttachment, setSelectedAttachment] = useState<{ url: string; originalName: string } | null>(null);
+  const [newAttachment, setNewAttachment] = useState("");
+  const [attachmentSizes, setAttachmentSizes] = useState<{
+    [key: number]: string;
+  }>({});
+  const [selectedAttachment, setSelectedAttachment] = useState<{
+    url: string;
+    originalName: string;
+  } | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -75,17 +96,21 @@ const AnnouncementDetails: React.FC = () => {
         for (let i = 0; i < announcement.attachments.length; i++) {
           const attachment = announcement.attachments[i];
           try {
-            const response = await fetch(attachment.url, { method: 'HEAD' });
+            const response = await fetch(attachment.url, { method: "HEAD" });
             if (!response.ok) {
               throw new Error(`HTTP error! status: ${response.status}`);
             }
-            const size = response.headers.get('content-length');
-            sizes[i] = size ? `${(parseInt(size) / 1024).toFixed(2)} KB` : 'Size unavailable (server-side fetch required)';
+            const size = response.headers.get("content-length");
+            sizes[i] = size
+              ? `${(parseInt(size) / 1024).toFixed(2)} KB`
+              : "Size unavailable (server-side fetch required)";
             if (!size && attachment.url.match(/\.(pdf|docx)$/i)) {
-              console.warn(`No content-length for ${attachment.url}. Consider backend API for accurate size.`);
+              console.warn(
+                `No content-length for ${attachment.url}. Consider backend API for accurate size.`
+              );
             }
           } catch (err) {
-            sizes[i] = 'Size unavailable (error fetching)';
+            sizes[i] = "Size unavailable (error fetching)";
             console.error(`Error fetching size for ${attachment.url}:`, err);
           }
         }
@@ -97,8 +122,8 @@ const AnnouncementDetails: React.FC = () => {
 
   useEffect(() => {
     if (announcement) {
-      setEditTitle(announcement.title || '');
-      setEditContent(announcement.content || '');
+      setEditTitle(announcement.title || "");
+      setEditContent(announcement.content || "");
       setEditAttachments(announcement.attachments?.map((a) => a.url) || []);
     }
   }, [announcement]);
@@ -106,28 +131,33 @@ const AnnouncementDetails: React.FC = () => {
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setDropdownOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   if (isLoading) return <ThemedText className="p-4">Loading...</ThemedText>;
-  if (error) return <ThemedText className="text-error p-4">{error.message}</ThemedText>;
-  if (!announcement) return <ThemedText className="p-4">Announcement not found.</ThemedText>;
+  if (error)
+    return <ThemedText className="text-error p-4">{error.message}</ThemedText>;
+  if (!announcement)
+    return <ThemedText className="p-4">Announcement not found.</ThemedText>;
 
   const handleAddComment = () => {
-    if (newComment.trim() === '') return;
+    if (newComment.trim() === "") return;
     addComment(
       {
-        type: 'generalAnnouncement',
+        type: "generalAnnouncement",
         targetId: announcementId,
         content: newComment,
       },
       {
-        onSuccess: () => setNewComment(''),
+        onSuccess: () => setNewComment(""),
       }
     );
   };
@@ -138,10 +168,18 @@ const AnnouncementDetails: React.FC = () => {
         { pollId: announcement.poll.poll_id, optionId },
         {
           onSuccess: (response) => {
-            queryClient.invalidateQueries(['pollResponses', announcement.poll.poll_id]);
-            api.get(`/polls/${announcement.poll.poll_id}/responses`).then((res) => {
-              queryClient.setQueryData(['pollResponses', announcement.poll.poll_id], res.data);
-            });
+            queryClient.invalidateQueries([
+              "pollResponses",
+              announcement.poll.poll_id,
+            ]);
+            api
+              .get(`/polls/${announcement.poll.poll_id}/responses`)
+              .then((res) => {
+                queryClient.setQueryData(
+                  ["pollResponses", announcement.poll.poll_id],
+                  res.data
+                );
+              });
           },
         }
       );
@@ -160,16 +198,19 @@ const AnnouncementDetails: React.FC = () => {
         data: {
           title: editTitle,
           content: editContent,
-          attachments: editAttachments.map((url) => ({ url, originalName: url.split('/').pop() || 'attachment' })),
+          attachments: editAttachments.map((url) => ({
+            url,
+            originalName: url.split("/").pop() || "attachment",
+          })),
         },
       },
       {
         onSuccess: () => {
-          queryClient.invalidateQueries(['announcements']);
-          queryClient.invalidateQueries(['announcement', announcementId]);
+          queryClient.invalidateQueries(["announcements"]);
+          queryClient.invalidateQueries(["announcement", announcementId]);
           setEditModalOpen(false);
           setEditAttachments([]);
-          setNewAttachment('');
+          setNewAttachment("");
         },
       }
     );
@@ -178,7 +219,7 @@ const AnnouncementDetails: React.FC = () => {
   const addAttachment = () => {
     if (newAttachment.trim()) {
       setEditAttachments([...editAttachments, newAttachment]);
-      setNewAttachment('');
+      setNewAttachment("");
     }
   };
 
@@ -189,8 +230,8 @@ const AnnouncementDetails: React.FC = () => {
   const handleDelete = () => {
     deleteAnnouncement(announcementId, {
       onSuccess: () => {
-        queryClient.invalidateQueries(['announcements']);
-        navigate('/announcements');
+        queryClient.invalidateQueries(["announcements"]);
+        navigate("/announcements");
       },
     });
   };
@@ -201,19 +242,38 @@ const AnnouncementDetails: React.FC = () => {
 
   // Calculate vote counts for each option
   const voteCounts = announcement.poll?.options?.reduce((acc, opt) => {
-    acc[opt.option_id] = pollResponses?.filter((r) => r.poll_option_id === opt.option_id).length || 0;
+    acc[opt.option_id] =
+      pollResponses?.filter((r) => r.poll_option_id === opt.option_id).length ||
+      0;
     return acc;
   }, {} as { [key: number]: number });
 
-  const totalVotes = announcement.poll?.options?.reduce((sum, opt) => sum + (voteCounts?.[opt.option_id] || 0), 0) || 0;
+  const totalVotes =
+    announcement.poll?.options?.reduce(
+      (sum, opt) => sum + (voteCounts?.[opt.option_id] || 0),
+      0
+    ) || 0;
 
   // Helper to determine icon and type based on file type
   const getFileInfo = (url: string) => {
-    if (url.endsWith('.pdf')) return { icon: <FileText className="w-6 h-6 text-error" />, type: 'PDF' };
-    if (url.endsWith('.doc') || url.endsWith('.docx')) return { icon: <File className="w-6 h-6 text-blue-500" />, type: 'DOCX' };
-    if (url.match(/\.(jpeg|jpg|png|gif)$/i)) return { icon: <Image className="w-6 h-6 text-green-500" />, type: 'IMG' };
-    if (url.endsWith('.mp4') || url.endsWith('.mov')) return { icon: <File className="w-6 h-6 text-purple-500" />, type: 'VIDEO' };
-    return { icon: <File className="w-6 h-6 text-neutral-text-tertiary" />, type: 'UNKNOWN' };
+    if (url.endsWith(".pdf"))
+      return { icon: <FileText className="w-6 h-6 text-error" />, type: "PDF" };
+    if (url.endsWith(".doc") || url.endsWith(".docx"))
+      return { icon: <File className="w-6 h-6 text-blue-500" />, type: "DOCX" };
+    if (url.match(/\.(jpeg|jpg|png|gif)$/i))
+      return {
+        icon: <Image className="w-6 h-6 text-green-500" />,
+        type: "IMG",
+      };
+    if (url.endsWith(".mp4") || url.endsWith(".mov"))
+      return {
+        icon: <File className="w-6 h-6 text-purple-500" />,
+        type: "VIDEO",
+      };
+    return {
+      icon: <File className="w-6 h-6 text-neutral-text-tertiary" />,
+      type: "UNKNOWN",
+    };
   };
 
   const closeModal = () => setSelectedAttachment(null);
@@ -225,20 +285,29 @@ const AnnouncementDetails: React.FC = () => {
         <div className="flex justify-between items-start mb-6 mt-6">
           <div className="flex gap-2">
             <img
-                                  src="../../src/assets/admins/valerie.jpg"
-
+              src="../../src/assets/admins/valerie.jpg"
               alt=""
               className="w-10 h-10 rounded-full bg-background-neutral"
             />
             <div className="flex-1">
-              <ThemedText variant="h4">{announcement.admin.user.name}</ThemedText>
-              <ThemedText variant="caption" className="text-neutral-text-tertiary">
+              <ThemedText variant="h4">
+                {announcement.admin.user.name}
+              </ThemedText>
+              <ThemedText
+                variant="caption"
+                className="text-neutral-text-tertiary"
+              >
                 {getTimeAgo(announcement.created_at)}
               </ThemedText>
             </div>
           </div>
-          {(isAdminOrSuperAdmin || announcement.admin.user_id === currentUserId) && (
-            <div className="relative" onClick={(e) => e.stopPropagation()} ref={dropdownRef}>
+          {(isAdminOrSuperAdmin ||
+            announcement.admin.user_id === currentUserId) && (
+            <div
+              className="relative"
+              onClick={(e) => e.stopPropagation()}
+              ref={dropdownRef}
+            >
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}
                 className="text-neutral-text-secondary hover:text-primary-base p-2"
@@ -272,13 +341,23 @@ const AnnouncementDetails: React.FC = () => {
           )}
         </div>
         <div className="mb-6">
-          <ThemedText variant="h2" className="text-xl mb-2 text-neutral-text-primary">{announcement.title}</ThemedText>
-          <ThemedText>{announcement.content || 'No details provided.'}</ThemedText>
+          <ThemedText
+            variant="h2"
+            className="text-xl mb-2 text-neutral-text-primary"
+          >
+            {announcement.title}
+          </ThemedText>
+          <ThemedText>
+            {announcement.content || "No details provided."}
+          </ThemedText>
         </div>
         {announcement.attachments?.length > 0 && (
           <div className="mb-6">
             {announcement.attachments.map((attachment, index) => {
-              const fileName = attachment.originalName || attachment.url.split('/').pop()?.split('?')[0] || `file_${index}`;
+              const fileName =
+                attachment.originalName ||
+                attachment.url.split("/").pop()?.split("?")[0] ||
+                `file_${index}`;
               const { icon, type } = getFileInfo(attachment.url);
               return (
                 <div
@@ -300,13 +379,14 @@ const AnnouncementDetails: React.FC = () => {
                       <ThemedText className="text-xs text-neutral-text-tertiary">
                         {type.toLowerCase()}
                       </ThemedText>
-                      {type.toLowerCase() !== 'video' && type.toLowerCase() !== 'img' && (
-                        <ThemedText className="text-xs text-neutral-text-tertiary">
-                          {12} pages
-                        </ThemedText>
-                      )}
+                      {type.toLowerCase() !== "video" &&
+                        type.toLowerCase() !== "img" && (
+                          <ThemedText className="text-xs text-neutral-text-tertiary">
+                            {12} pages
+                          </ThemedText>
+                        )}
                       <ThemedText className="text-xs text-neutral-text-tertiary">
-                        {attachmentSizes[index] || 'Loading...'}
+                        {attachmentSizes[index] || "Loading..."}
                       </ThemedText>
                     </div>
                   </div>
@@ -338,7 +418,7 @@ const AnnouncementDetails: React.FC = () => {
                   alt={selectedAttachment.originalName}
                   className="max-w-full max-h-full object-contain"
                 />
-              ) : selectedAttachment.url.endsWith('.pdf') ? (
+              ) : selectedAttachment.url.endsWith(".pdf") ? (
                 <iframe
                   src={selectedAttachment.url}
                   title="PDF Viewer"
@@ -346,7 +426,10 @@ const AnnouncementDetails: React.FC = () => {
                 />
               ) : (
                 <div className="text-neutral-text-secondary text-center">
-                  <p>Preview not available for {selectedAttachment.originalName}. Download to view.</p>
+                  <p>
+                    Preview not available for {selectedAttachment.originalName}.
+                    Download to view.
+                  </p>
                   <a
                     href={selectedAttachment.url}
                     target="_blank"
@@ -364,12 +447,17 @@ const AnnouncementDetails: React.FC = () => {
         {/* Poll Section */}
         {announcement.is_poll && announcement.poll && (
           <div className="mb-6">
-            <ThemedText variant="h2" className="text-xl mb-4">Poll: {announcement.poll.type}</ThemedText>
+            <ThemedText variant="h2" className="text-xl mb-4">
+              Poll: {announcement.poll.type}
+            </ThemedText>
             {announcement.poll.options?.map((opt) => {
               const votes = voteCounts?.[opt.option_id] || 0;
-              const percentage = totalVotes > 0 ? (votes / totalVotes) * 100 : 0;
+              const percentage =
+                totalVotes > 0 ? (votes / totalVotes) * 100 : 0;
               const hasVoted = pollResponses?.some(
-                (r) => r.user_id === currentUserId && r.poll_option_id === opt.option_id
+                (r) =>
+                  r.user_id === currentUserId &&
+                  r.poll_option_id === opt.option_id
               );
               return (
                 <div key={opt.option_id} className="mb-2">
@@ -406,8 +494,11 @@ const AnnouncementDetails: React.FC = () => {
               <div className="mt-4">
                 <ThemedText variant="h3">Responses</ThemedText>
                 {pollResponses.map((response) => (
-                  <ThemedText key={response.response_id} className="text-neutral-text-secondary">
-                    {response.user.name} responded at{' '}
+                  <ThemedText
+                    key={response.response_id}
+                    className="text-neutral-text-secondary"
+                  >
+                    {response.user.name} responded at{" "}
                     {new Date(response.responded_at).toLocaleString()}
                   </ThemedText>
                 ))}
@@ -450,11 +541,16 @@ const AnnouncementDetails: React.FC = () => {
         {editModalOpen && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-background-main p-6 rounded-lg w-96">
-              <ThemedText variant="h2" className="text-xl mb-4 text-neutral-text-secondary">
+              <ThemedText
+                variant="h2"
+                className="text-xl mb-4 text-neutral-text-secondary"
+              >
                 Edit Announcement
               </ThemedText>
               <div className="mb-4">
-                <label className="block text-sm text-neutral-text-secondary mb-1">Title</label>
+                <label className="block text-sm text-neutral-text-secondary mb-1">
+                  Title
+                </label>
                 <input
                   type="text"
                   value={editTitle}
@@ -464,7 +560,9 @@ const AnnouncementDetails: React.FC = () => {
                 />
               </div>
               <div className="mb-4">
-                <label className="block text-sm text-neutral-text-secondary mb-1">Content</label>
+                <label className="block text-sm text-neutral-text-secondary mb-1">
+                  Content
+                </label>
                 <textarea
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
@@ -474,7 +572,9 @@ const AnnouncementDetails: React.FC = () => {
                 />
               </div>
               <div className="mb-4">
-                <label className="block text-sm text-neutral-text-secondary mb-1">Attachments</label>
+                <label className="block text-sm text-neutral-text-secondary mb-1">
+                  Attachments
+                </label>
                 {editAttachments.map((url, index) => (
                   <div key={index} className="flex items-center mb-2">
                     <input

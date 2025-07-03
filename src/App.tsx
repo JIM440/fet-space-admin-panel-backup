@@ -71,7 +71,7 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({
           <button className="text-neutral-text-secondary">
             <img
               alt=""
-              src="https://media.licdn.com/dms/image/v2/C4D03AQG-FTte7FKNGQ/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1602254903738?e=2147483647&v=beta&t=vZV6Bw27GkMcer10Ul6QzA1ZzOAGioQUQygtJFxiyEw"
+              src="../../src/assets/admins/valerie.jpg"
               className="w-9 h-9 bg-background-neutral rounded-full"
             />
           </button>

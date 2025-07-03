@@ -30,6 +30,23 @@ const studentImages = [
   "../../../src/assets/students/student9.jpg",
   "../../../src/assets/students/student10.jpg",
   "../../../src/assets/students/student11.jpg",
+  "../../../src/assets/students/student1.jpg",
+  "../../../src/assets/students/student12.jpg",
+  "../../../src/assets/students/student3.jpg",
+  "../../../src/assets/students/student13.jpg",
+  "../../../src/assets/students/student4.jpg",
+  "../../../src/assets/students/student5.jpg",
+  "../../../src/assets/students/student6.jpg",
+  "../../../src/assets/students/student7.jpg",
+  "../../../src/assets/students/student8.jpg",
+  "../../../src/assets/students/student9.jpg",
+  "../../../src/assets/students/student10.jpg",
+  "../../../src/assets/students/student11.jpg",
+  "../../../src/assets/students/student7.jpg",
+  "../../../src/assets/students/student8.jpg",
+  "../../../src/assets/students/student9.jpg",
+  "../../../src/assets/students/student10.jpg",
+  "../../../src/assets/students/student11.jpg",
 ];
 
 const ManageStudents: React.FC = () => {
@@ -46,7 +63,8 @@ const ManageStudents: React.FC = () => {
   const { data: searchedStudents, isLoading: isSearchLoading } =
     useSearchStudents(searchQuery);
   const { mutate: addStudent } = useAddStudent();
-  const { mutate: addMultipleStudents } = useAddMultipleStudents();
+  const { mutate: addMultipleStudents, isPending: isAddingMultipleStudents } =
+    useAddMultipleStudents();
   const { mutate: editStudent } = useEditStudent();
   const { mutate: deleteStudent } = useDeleteStudent();
 
@@ -155,8 +173,7 @@ const ManageStudents: React.FC = () => {
     const users = previewData.map(
       ([
         name,
-        email, // Skip password field
-        ,
+        email,
         matricule_number,
         level,
         institutional_email,
@@ -339,6 +356,9 @@ const ManageStudents: React.FC = () => {
           <Search />
         </button>
       </div>
+      <ThemedText variant="h3" className="mb-4 ml-2">
+        {displayStudents.length || 0} Students
+      </ThemedText>
       {displayStudents?.map((student, index) => (
         <div
           key={student.user_id}
@@ -568,7 +588,7 @@ const ManageStudents: React.FC = () => {
             {previewData.length > 0 ? (
               <>
                 <ThemedText variant="h4" className="mb-2">
-                  Preview
+                  Preview ({previewData.length} students){" "}
                 </ThemedText>
                 <div className="space-y-2 mb-4 max-h-[200px] overflow-y-auto">
                   {previewData.map(
@@ -621,6 +641,9 @@ const ManageStudents: React.FC = () => {
                   <button
                     onClick={addMultipleStudentsHandler}
                     className="bg-primary-base text-white px-4 py-2 rounded-md"
+                    disabled={
+                      previewData.length === 0 || isAddingMultipleStudents
+                    }
                   >
                     Add Students
                   </button>

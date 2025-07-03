@@ -11,10 +11,11 @@ import { Ellipsis } from "lucide-react";
 import ThemedText from "@/components/commons/typography/ThemedText";
 
 const adminImages = [
-  "../../../src/assets/admins/fute.jpg",
-  "../../../src/assets/admins/fozin.jpg",
   "../../../src/assets/admins/valerie.jpg",
+  "../../../src/assets/admins/fozin.jpg",
   "../../../src/assets/admins/sop.jpg",
+  "../../../src/assets/admins/nguti.jpg",
+  "../../../src/assets/admins/fute.jpg",
 ];
 
 const ManageAdmins: React.FC = () => {
@@ -231,11 +232,11 @@ const ManageAdmins: React.FC = () => {
             </label>
             <input
               type="email"
-              value={singleAdminForm.email}
+              value={singleAdminForm.phone_number}
               onChange={(e) =>
                 setSingleAdminForm({
                   ...singleAdminForm,
-                  email: e.target.value,
+                  phone_number: e.target.value,
                 })
               }
               placeholder="Enter admin phone number"
